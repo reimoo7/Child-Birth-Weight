@@ -9,14 +9,14 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-source ("child_birth_helper.R")
+source ("../R_src/child_birth_helper.R")
 ```
 
 
 ## 1 Pre-fitting data diagnostic
 ### 1.1 Original dataset summary
 ```{r}
-chds <- read.csv("chds_births.csv", sep=",")
+chds <- read.csv("../data/chds_births.csv", sep=",")
 summary(chds) 
 ```
 $$ Table \ 1.1 $$
