@@ -1,0 +1,954 @@
+---
+title: "Child Birth Weight"
+author: "Karim Reimoo"
+date: "16/12/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1 Pre-fitting data diagnostic
+### 1.1 Original dataset summary
+```{r}
+chds <- read.csv("chds_births.csv", sep=",")
+summary(chds) 
+```
+$$ Table \ 1.1 $$
+
+\newpage
+
+### 1.2 Treatment of erroneous data
+```{r}
+# drop observations which have value 0 for covariate 'marital' 
+chds <- chds[chds$marital != 0, ]
+```
+
+### 1.3 Treatment of NAs
+```{r}
+pairs(~ wt + fwt + fht, data=chds)
+```
+$$ Figure \ 1.1 $$
+
+```{r, warning=FALSE}
+library(mice)
+
+# removing father's weight and height from our dataset 
+chds$fwt <- NULL
+chds$fht <- NULL
+
+# imputing missing data
+system.time({ 
+  chds_imp = mice(chds, m=5, printFlag=FALSE, maxit=50, seed=331)
+})
+
+# extracting five imputed datasets
+chds1 <- complete(chds_imp, 1)
+chds2 <- complete(chds_imp, 2)
+chds3 <- complete(chds_imp, 3)
+chds4 <- complete(chds_imp, 4)
+chds5 <- complete(chds_imp, 5)
+```
+
+\newpage
+
+### 1.4 Converting categorical covariates into factors 
+```{r}
+# constructing smoke level factors
+smoke_levels <- c("never", "until_pregnancy", "used_to_not_anymore", "smokes_now")
+encode_smoke <- function(chds)
+{
+  smoke2 <- smoke_levels[chds$smoke+1]
+  smoke2 <- factor(smoke2, levels=smoke_levels)
+  chds$smoke <- smoke2
+  
+  return(chds)
+}
+
+chds1 <- encode_smoke(chds1)
+chds2 <- encode_smoke(chds2)
+chds3 <- encode_smoke(chds3)
+chds4 <- encode_smoke(chds4)
+chds5 <- encode_smoke(chds5)
+
+# constructing med factors
+med_levels <- c("elementary", "middle", "high", "high+trade", "high+college", "college_grad",     
+                "trade", "high_unclear")
+encode_med <- function(chds)
+{
+  med2 <- med_levels[chds$med+1]
+  med2 <- factor(med2, levels=med_levels)
+  chds$med <- med2
+  return(chds)
+}
+
+chds1 <- encode_med(chds1)
+chds2 <- encode_med(chds2)
+chds3 <- encode_med(chds3)
+chds4 <- encode_med(chds4)
+chds5 <- encode_med(chds5)
+
+fed_levels <- c("elementary", "middle", "high", "high+trade", "high+college", "college_grad", 
+                "trade", "high_unclear")
+# constructing fed factors
+encode_fed <- function(chds)
+{
+  fed2 <- fed_levels[chds$fed+1]
+  fed2 <- factor(fed2, levels=fed_levels)
+  chds$fed <- fed2
+  return(chds)
+}
+
+chds1 <- encode_fed(chds1)
+chds2 <- encode_fed(chds2)
+chds3 <- encode_fed(chds3)
+chds4 <- encode_fed(chds4)
+chds5 <- encode_fed(chds5)
+
+# constructiong marital factors
+marital_levels <- c("married", "legally_separated", "divorced", "widowed", "never_married",                                   "not_married")
+encode_marital <- function(chds)
+{
+  marital2 <- marital_levels[chds$marital]
+  marital2 <- factor(marital2, levels=marital_levels)
+  chds$marital <- marital2
+  return(chds)
+}
+
+chds1 <- encode_marital(chds1)
+chds2 <- encode_marital(chds2)
+chds3 <- encode_marital(chds3)
+chds4 <- encode_marital(chds4)
+chds5 <- encode_marital(chds5)
+
+# constructing time factors 
+time_levels <- c("never_smoked", "<1year", "1-2years", "2-3years", "3-4years", "5-9years", ">10years",                     "during_pregnancy", "still_smokes", "quit_but_dont_know_when")
+encode_time <- function(chds)
+{
+  time2 <- time_levels[chds$time+1]
+  time2 <- factor(time2, levels=time_levels)
+  chds$time <- time2
+  return(chds)
+}
+
+chds1 <- encode_time(chds1)
+chds2 <- encode_time(chds2)
+chds3 <- encode_time(chds3)
+chds4 <- encode_time(chds4)
+chds5 <- encode_time(chds5)
+
+# constructing number factors 
+number_levels <- c("never_smoked", "1-4", "5-9", "10-14", "15-19", "20-29", "30-39", "40-60", ">60",                         "smoked_but_dont_know_how_much")
+encode_number <- function(chds)
+{
+  number2 <- number_levels[chds$number+1]
+  number2 <- factor(number2, levels=number_levels)
+  chds$number <- number2
+  return(chds)
+}
+
+chds1 <- encode_number(chds1)
+chds2 <- encode_number(chds2)
+chds3 <- encode_number(chds3)
+chds4 <- encode_number(chds4)
+chds5 <- encode_number(chds5)
+
+# constructing income factors
+income_levels <- c("<2500", "2500-4999", "5000-7499", "7500-9999", "10000-12499", "12500-14999",
+                   "15000-17499", "17500-19999", "20000-22499", ">=22500")
+encode_income <- function(chds)
+{
+  income2 <- income_levels[chds$income+1]
+  income2 <- factor(income2, levels=income_levels)
+  chds$income <- income2
+  return(chds)
+}
+
+chds1 <- encode_income(chds1)
+chds2 <- encode_income(chds2)
+chds3 <- encode_income(chds3)
+chds4 <- encode_income(chds4)
+chds5 <- encode_income(chds5)
+
+# constructing meth and feth factors
+eth_levels <- c("Caucasian", "Mexican", "African-American", "Asian", "Mixed", "Other")
+encode_eth <- function(chds)
+{
+  max_eth <- max(chds$meth) + 1
+  eth_threshold <- c(0, 6, 7, 8, 9, 10, 11)
+  meth <- cut(chds$meth, breaks=eth_threshold, labels= eth_levels, right=FALSE)
+  feth <- cut(chds$feth, breaks=eth_threshold, labels= eth_levels, right=FALSE)
+  chds$meth <- meth
+  chds$feth <- feth
+  chds$meth <- factor(chds$meth, levels=eth_levels)
+  chds$feth <- factor(chds$feth, levels=eth_levels)
+  return(chds)
+}
+
+chds1 <- encode_eth(chds1)
+chds2 <- encode_eth(chds2)
+chds3 <- encode_eth(chds3)
+chds4 <- encode_eth(chds4)
+chds5 <- encode_eth(chds5)
+```
+
+\newpage
+
+### 1.5 Handling covariate categories with few observations
+```{r}
+# Changing factor levels for marital
+change_marital_factors <- function(chds)
+{
+  chds$marital[chds$marital != "married"] <- "not_married"
+  chds$marital <- droplevels(chds$marital)
+  return(chds)
+}
+
+chds1 <- change_marital_factors(chds1)
+chds2 <- change_marital_factors(chds2)
+chds3 <- change_marital_factors(chds3)
+chds4 <- change_marital_factors(chds4)
+chds5 <- change_marital_factors(chds5)
+
+# Changing factor levels for meth
+change_meth_factor_levels <- function(chds)
+{
+  chds$meth[chds$meth == "Mexican"] <- "Other"
+  chds$meth[chds$meth == "Asian"] <- "Other"
+  chds$meth[chds$meth == "Mixed"] <- "Other"
+  chds$meth <- droplevels(chds$meth)
+  return(chds)
+}
+
+chds1 <- change_meth_factor_levels(chds1)
+chds2 <- change_meth_factor_levels(chds2)
+chds3 <- change_meth_factor_levels(chds3)
+chds4 <- change_meth_factor_levels(chds4)
+chds5 <- change_meth_factor_levels(chds5)
+
+# Changing factor levels for med
+change_med_levels <- function(chds)
+{
+  # Adding new category "upto_medical_school" in categories for med
+  med_levels <- c("upto_high_school", med_levels)
+  chds$med <- factor(chds$med, levels=med_levels)
+
+  # Shift observations in category "elementary" to category "upto_high_school"
+  chds$med[chds$med == "elementary"] <- "upto_high_school"
+
+  # Shift observations in category "middle" to category "upto_high_school"
+  chds$med[chds$med == "middle"] <- "upto_high_school"
+  
+  # Shift observations in category "high" to category "upto_high_school"
+  chds$med[chds$med == "high"] <- "upto_high_school"
+
+  # Removing all observations with level "high_unclear"
+  chds <- chds[chds$med != "high_unclear", ]
+  
+  # Drop all categories which have no observation and "high_unclear" category
+  chds$med <- droplevels(chds$med)
+
+  return(chds)
+}
+
+chds1 <- change_med_levels(chds1)
+chds2 <- change_med_levels(chds2)
+chds3 <- change_med_levels(chds3)
+chds4 <- change_med_levels(chds4)
+chds5 <- change_med_levels(chds5)
+
+# Changing factor levels for feth
+change_feth_levels <- function(chds)
+{
+  # Converting feth into a categorical covariate with categories "Caucasian", 
+  # "African-American", "Other"
+  chds$feth[chds$feth == "Mexican"] <- "Other"
+  chds$feth[chds$feth == "Asian"] <- "Other"
+  chds$feth[chds$feth == "Mixed"] <- "Other"
+  chds$feth <- droplevels(chds$feth)
+  
+  return(chds)
+}
+
+chds1 <- change_feth_levels(chds1)
+chds2 <- change_feth_levels(chds2)
+chds3 <- change_feth_levels(chds3)
+chds4 <- change_feth_levels(chds4)
+chds5 <- change_feth_levels(chds5)
+
+# Changing factor levels for fed
+change_fed_levels <- function(chds)
+{
+  # Handling fed 
+  # adding new category "upto_medical_school" in categories for fed
+  fed_levels <- c("upto_high_school", fed_levels)
+  chds$fed <- factor(chds$fed, levels=fed_levels)
+  
+  # shift observations in category "elementary" to category "upto_high_school"
+  chds$fed[chds$fed == "elementary"] <- "upto_high_school"
+  
+  # shift observations in category "middle" to category "upto_high_school"
+  chds$fed[chds$fed == "middle"] <- "upto_high_school"
+  
+  # shift observations in category "high" to category "upto_high_school"
+  chds$fed[chds$fed == "high"] <- "upto_high_school"
+  
+  # Removing all observations with level "trade"
+  chds <- chds[chds$fed != "trade",]
+  
+  # Removing all observations with level "high_school_unclear"
+  chds <- chds[chds$fed != "high_unclear", ]
+  
+  # drop all categories which have no observation and "high_unclear" category
+  chds$fed <- droplevels(chds$fed)
+  
+  return(chds)
+}
+
+chds1 <- change_fed_levels(chds1)
+chds2 <- change_fed_levels(chds2)
+chds3 <- change_fed_levels(chds3)
+chds4 <- change_fed_levels(chds4)
+chds5 <- change_fed_levels(chds5)
+
+# Changing factor levels for income
+change_income_levels <- function(chds)
+{
+  # Adding new categories "0-4999" and ">=20000" to income
+  income_levels <- c("0-4999", income_levels, "5000-14999", ">=15000")
+  
+  chds$income <- factor(chds$income, levels=income_levels)
+  chds$income[chds$income == "<2500"] <- "0-4999"
+  chds$income[chds$income == "2500-4999"] <- "0-4999"
+  
+  chds$income[chds$income == "5000-7499"] <- "5000-14999"
+  chds$income[chds$income == "7500-9999"] <- "5000-14999"
+  chds$income[chds$income == "10000-12499"] <- "5000-14999"
+  chds$income[chds$income == "12500-14999"] <- "5000-14999"
+  
+  chds$income[chds$income == "15000-17499"] <- ">=15000"
+  chds$income[chds$income == "17500-19999"] <- ">=15000"
+  chds$income[chds$income == "20000-22499"] <- ">=15000"
+  chds$income[chds$income == ">=22500"] <- ">=15000"
+  
+  # drop all income categories which have no observation
+  chds$income <- droplevels(chds$income)
+  
+  return(chds)
+}
+
+chds1 <- change_income_levels(chds1)
+chds2 <- change_income_levels(chds2)
+chds3 <- change_income_levels(chds3)
+chds4 <- change_income_levels(chds4)
+chds5 <- change_income_levels(chds5)
+
+# Changing factor levels for time
+change_time_levels <- function(chds)
+{
+  # Adding new categories "0-2years" ">2years" to time
+  time_levels <- c("0-2years", ">2years", time_levels)
+
+  chds$time <- factor(chds$time, levels=time_levels)
+  chds$time[chds$time == "<1year"] <- "0-2years"
+  chds$time[chds$time == "1-2years"] <- "0-2years"
+  
+  chds$time[chds$time == "2-3years"] <- ">2years"
+  chds$time[chds$time == "3-4years"] <- ">2years"
+  chds$time[chds$time == "5-9years"] <- ">2years"
+  chds$time[chds$time == ">10years"] <- ">2years"
+  
+  # Removing all observations with level "quit_but_dont_know_when"
+  chds <- chds[chds$time != "quit_but_dont_know_when",]
+  
+  # Removing all observations with level "still_smokes"
+  chds <- chds[chds$time != "still_smokes",]
+  
+  # Drop all time categories which have no observation
+  chds$time <- droplevels(chds$time)
+  
+  return(chds)
+}
+
+chds1 <- change_time_levels(chds1)
+chds2 <- change_time_levels(chds2)
+chds3 <- change_time_levels(chds3)
+chds4 <- change_time_levels(chds4)
+chds5 <- change_time_levels(chds5)
+
+
+# Changing factor levels for time
+change_number_levels <- function(chds)
+{
+  #Adding new categories "1-9" ">=10" to number
+  number_levels <- c(number_levels, "1-9", ">=10")
+
+  chds$number <- factor(chds$number, levels=number_levels)
+  chds$number[chds$number == "1-4"] <- "1-9"
+  chds$number[chds$number == "5-9"] <- "1-9"
+  
+  chds$number[chds$number == "10-14"] <- ">=10"
+  chds$number[chds$number == "10-14"] <- ">=10"
+  chds$number[chds$number == "15-19"] <- ">=10"
+  chds$number[chds$number == "20-29"] <- ">=10"
+  chds$number[chds$number == "30-39"] <- ">=10"
+  chds$number[chds$number == "40-60"] <- ">=10"
+  chds$number[chds$number == ">60"] <- ">=10"
+  
+  # Removing all observations with level "smoked_but_dont_know_how_much"  
+  chds <- chds[chds$number != "smoked_but_dont_know_how_much",]
+
+  # Drop all number categories which have no observation
+  chds$number <- droplevels(chds$number)  
+  
+  return(chds)
+}
+
+chds1 <- change_number_levels(chds1)
+chds2 <- change_number_levels(chds2)
+chds3 <- change_number_levels(chds3)
+chds4 <- change_number_levels(chds4)
+chds5 <- change_number_levels(chds5)
+```
+
+\newpage
+
+### 1.6 pairs plot for all the continuous covariates
+```{r}
+pairs(~ wt + gestation + parity + mage + mht + mwt + fage, data=chds1)
+```
+
+```{r}
+library(plyr)
+# counting distinct values in covariates "parity" and "mht"
+count(chds1, vars="parity")
+count(chds1, vars="mht")
+```
+
+\newpage
+```{r}
+# encode parity 
+parity_levels <- c("0", "1", "2", ">=3")
+parity_levels <- c("no_prev_preg", "one_prev_preg", "two_prev_preg", "at_least_three_prev_preg")
+encode_parity <- function(chds)
+{
+  max_parity <- max(chds$parity) + 1
+  parity_threshold <- c(0, 1, 2, 3, max_parity)
+  parity2 <- cut(chds$parity, breaks=parity_threshold, labels=parity_levels, right=FALSE)
+  chds$parity <- parity2
+  chds$parity <- factor(chds$parity, levels=parity_levels)
+
+  return(chds)
+}
+
+chds1 <- encode_parity(chds1)
+chds2 <- encode_parity(chds2)
+chds3 <- encode_parity(chds3)
+chds4 <- encode_parity(chds4)
+chds5 <- encode_parity(chds5)
+
+# encode mht 
+mht_levels <- c("at_most_60", "61-63", "64-66", "at_least_67")
+encode_mht <- function(chds)
+{
+  max_mht <- max(chds$mht)
+  mht_threshold <- c(0, 60, 63, 66, max_mht)
+  mht2 <- cut(chds$mht, breaks=mht_threshold, labels= mht_levels, right=TRUE)
+  chds$mht <- mht2
+  chds$mht <- factor(chds$mht, levels=mht_levels)
+  
+  return(chds)
+}
+
+chds1 <- encode_mht(chds1)
+chds2 <- encode_mht(chds2)
+chds3 <- encode_mht(chds3)
+chds4 <- encode_mht(chds4)
+chds5 <- encode_mht(chds5)
+```
+
+\newpage 
+```{r}
+# print comprehensive summary of factor encoded dataset
+summary(chds1)
+```
+$$ Table \ 1.2 $$
+\newpage
+
+## 2 Model selection
+
+### 2.1 Detecting and Removing Data Inconsistency
+```{r}
+# Removing inconsistencies between number and smoke
+chds1 <- chds1[!(chds1$smoke == "smokes_now" & chds1$number == "never_smoked"), ]
+chds1 <- chds1[!(chds1$smoke == "until_pregnancy" & chds1$number == "never_smoked"), ]
+
+chds2 <- chds2[!(chds2$smoke == "until_pregnancy" & chds2$number == "never_smoked"), ]
+
+chds4 <- chds4[!(chds4$smoke == "smokes_now" & chds4$number == "never_smoked"), ]
+chds4 <- chds1[!(chds4$smoke == "until_pregnancy" & chds4$number == "never_smoked"), ]
+
+
+table(chds1[c("number", "smoke")])
+table(chds2[c("number", "smoke")])
+table(chds3[c("number", "smoke")])
+table(chds4[c("number", "smoke")])
+table(chds5[c("number", "smoke")])
+```
+
+### 2.2 Automated model selection
+```{r}
+forward_selection <- function(chds)
+{
+  # minimal model: intercept only 
+  Mminimal <- lm(wt ~ 1, data=chds)
+  # all main effects and interaction
+  Mmaximal <- lm(wt ~ (.)^2, data=chds)
+  
+  system.time({
+    Mfwd <- step(object=Mminimal, 
+                 scope=list(lower=Mminimal, upper=Mmaximal),
+                 direction="forward",
+                 trace=FALSE)
+  })
+  
+  return(Mfwd)
+}
+
+Mfwd1 <- forward_selection(chds1)
+Mfwd2 <- forward_selection(chds2)
+Mfwd3 <- forward_selection(chds3)
+Mfwd4 <- forward_selection(chds4)
+Mfwd5 <- forward_selection(chds5)
+
+stepwise_selection <- function(chds)
+{
+# minimal model: intercept only 
+  Mminimal <- lm(wt ~ 1, data=chds)
+  # all main effects and interaction
+  Mmaximal <- lm(wt ~ (.)^2, data=chds)
+  # starting model for stepwise selection
+  Mstart <- lm(wt ~ ., data=chds)
+  
+  system.time({
+    Mstep <- step(object=Mstart, 
+                 scope=list(lower=Mminimal, upper=Mmaximal),
+                 direction="both",
+                 trace=FALSE)
+  })
+  
+  return(Mstep)
+}
+
+Mstep1 <- stepwise_selection(chds1)
+Mstep2 <- stepwise_selection(chds2)
+Mstep3 <- stepwise_selection(chds3)
+Mstep4 <- stepwise_selection(chds4)
+Mstep5 <- stepwise_selection(chds5)
+```
+
+### 2.3 Treatment of NAs in Beta_hat 
+```{r}
+# Extracting regression coeffecients
+Beta_hat_Mfwd1 <- coef(Mfwd1)
+Beta_hat_Mfwd2 <- coef(Mfwd2)
+Beta_hat_Mfwd3 <- coef(Mfwd3)
+Beta_hat_Mfwd4 <- coef(Mfwd4)
+Beta_hat_Mfwd5 <- coef(Mfwd5)
+
+Beta_hat_Mstep1 <- coef(Mstep1)
+Beta_hat_Mstep2 <- coef(Mstep2)
+Beta_hat_Mstep3 <- coef(Mstep3)
+Beta_hat_Mstep4 <- coef(Mstep4)
+Beta_hat_Mstep5 <- coef(Mstep5)
+
+# Checking for any NAs in regression coeffcients
+names(Beta_hat_Mfwd1)[is.na(Beta_hat_Mfwd1)]
+names(Beta_hat_Mfwd2)[is.na(Beta_hat_Mfwd2)]
+names(Beta_hat_Mfwd3)[is.na(Beta_hat_Mfwd3)]
+names(Beta_hat_Mfwd4)[is.na(Beta_hat_Mfwd4)]
+names(Beta_hat_Mfwd5)[is.na(Beta_hat_Mfwd5)]
+
+names(Beta_hat_Mstep1)[is.na(Beta_hat_Mstep1)]
+names(Beta_hat_Mstep2)[is.na(Beta_hat_Mstep2)]
+names(Beta_hat_Mstep3)[is.na(Beta_hat_Mstep3)]
+names(Beta_hat_Mstep4)[is.na(Beta_hat_Mstep4)]
+names(Beta_hat_Mstep5)[is.na(Beta_hat_Mstep5)]
+```
+
+\newpage
+### 2.4 Examining regression coeffecients in our fitted models
+```{r}
+formula(Mfwd1)
+formula(Mfwd2)
+formula(Mfwd3) 
+formula(Mfwd4) 
+formula(Mfwd5)
+
+formula(Mstep1)
+formula(Mstep2)
+formula(Mstep3)
+formula(Mstep4)
+formula(Mstep5)
+```
+
+### 2.5 Selecting Best Forward and Stepwise Selection Models
+```{r, warning=FALSE}
+# We have four different models from forward and stepwise selection each 
+# therefore, the following code is written  
+cv <- function(chds, split, n_iter, M1, M2, M3, M4, names, set_name)
+{
+  n <- nrow(chds)
+  
+  mspe1 <- rep(NA, n_iter)
+  mspe2 <- rep(NA, n_iter)
+  mspe3 <- rep(NA, n_iter)
+  mspe4 <- rep(NA, n_iter)
+  
+  for (i in 1:n_iter) {
+    
+    # shuffle dataset
+    shuffled <- chds[sample(n), ]
+    
+    # extract training set 
+    train_ind <- 1:round(split * n)
+    train <- shuffled[train_ind, ]
+    
+    # extract test set
+    test_ind <- (round(split * n) + 1):n
+    test <- shuffled[test_ind, ]
+    
+    # refit the models on the subset of training data
+    M1_cv <- lm(formula(M1), data=train)
+    M2_cv <- lm(formula(M2), data=train)
+    M3_cv <- lm(formula(M3), data=train)
+    M4_cv <- lm(formula(M4), data=train)
+    
+    # out-of-sample residuals for all five models
+    # that is, testing data - predictions with training parameters
+    M1_res <- test$wt - predict(M1_cv, newdata=test)
+    M2_res <- test$wt - predict(M2_cv, newdata=test)
+    M3_res <- test$wt - predict(M3_cv, newdata=test)
+    M4_res <- test$wt - predict(M4_cv, newdata=test)
+    
+    # mean-square prediction errors
+    mspe1[i] <- mean(M1_res^2)
+    mspe2[i] <- mean(M2_res^2)
+    mspe3[i] <- mean(M3_res^2)
+    mspe4[i] <- mean(M4_res^2)
+  }
+  
+  # drop any NA's in our computed mspe
+  mspe1 <- mspe1[!is.na(mspe1)]
+  mspe2 <- mspe2[!is.na(mspe2)]
+  mspe3 <- mspe3[!is.na(mspe3)]
+  mspe4 <- mspe4[!is.na(mspe4)]
+  
+  # box-plot and histogram
+  # plot rMSPE and out-of-sample log(Lambda)
+  par(mfrow = c(1,2))
+  par(mar = c(4.5, 4.5, .1, .1))
+  boxplot(x = list(sqrt(mspe1), sqrt(mspe2), sqrt(mspe3), sqrt(mspe4)), names = names, cex = .7,
+          ylab = expression(sqrt(MSPE)), col = c("yellow", "orange", "red", "blue"), main=set_name)
+  
+  return(c(mean(mspe1), mean(mspe2), mean(mspe3), mean(mspe4)))
+}
+
+# Stepwise Selection Final Model Competition
+n_iter <- 2000
+split <- 0.80
+
+snames=expression(M[step1], M[step2], M[step3], M[step5])
+fnames <- expression(M[fwd1], M[fwd2], M[fwd3], M[fwd5])
+```
+
+\newpage
+
+```{r, warning=FALSE}
+# Cross validation of unique step-wise selection models on chds1
+cv(chds1, split, n_iter, Mstep1, Mstep2, Mstep3, Mstep5, snames, "chds1")
+```
+$$ Figure \ 2.5.1 $$
+
+\newpage
+
+```{r, warning=FALSE}
+# Cross validation of unique step-wise selection models on chds2
+cv(chds2, split, n_iter, Mstep1, Mstep2, Mstep3, Mstep5, snames, "chds2")
+```
+$$ Figure \ 2.5.2 $$
+
+\newpage
+
+```{r, warning=FALSE}
+# Cross validation of unique step-wise selection models on chds3
+cv(chds3, split, n_iter, Mstep1, Mstep2, Mstep3, Mstep5, snames, "chds3")
+```
+$$ Figure \ 2.5.3 $$
+\newpage
+
+```{r, warning=FALSE}
+# Cross validation of unique step-wise selection models on chds4
+cv(chds4, split, n_iter, Mstep1, Mstep2, Mstep3, Mstep5, snames, "chds4")
+```
+$$ Figure \ 2.5.4 $$
+\newpage
+
+```{r, warning=FALSE}
+# Cross validation of unique step-wise selection models on chds5
+cv(chds5, split, n_iter, Mstep1, Mstep2, Mstep3, Mstep5, snames, "chds5")
+```
+$$ Figure \ 2.5.5 $$
+\newpage
+
+```{r, warning=FALSE}
+# Cross validation of unique forward selection models on chds1
+cv(chds1, split, n_iter, Mfwd1, Mfwd2, Mfwd3, Mfwd5, fnames, "chds1")
+```
+$$ Figure \ 2.5.6 $$
+\newpage
+
+```{r, warning=FALSE}
+# Cross validation of unique forward selection models on chds2
+cv(chds2, split, n_iter, Mfwd1, Mfwd2, Mfwd3, Mfwd5, fnames, "chds2")
+```
+$$ Figure \ 2.5.7 $$
+\newpage
+
+```{r, warning=FALSE}
+# Cross validation of unique forward selection models on chds3
+cv(chds3, split, n_iter, Mfwd1, Mfwd2, Mfwd3, Mfwd5, fnames, "chds3")
+```
+$$ Figure \ 2.5.8 $$
+\newpage
+
+```{r, warning=FALSE}
+# Cross validation of unique forward selection models on chds4
+cv(chds4, split, n_iter, Mfwd1, Mfwd2, Mfwd3, Mfwd5, fnames, "chds4")
+```
+$$ Figure \ 2.5.9 $$
+\newpage
+
+```{r, warning=FALSE}
+# Cross validation of unique forward selection models on chds5
+cv(chds5, split, n_iter, Mfwd1, Mfwd2, Mfwd3, Mfwd5, fnames, "chds5")
+```
+$$ Figure \ 2.5.10 $$
+
+### 2.6 Pooling Best Forward and Stepwise Selection Models
+```{r}
+# pooling Mfwd1
+Mfwd_best <- with(chds_imp, 
+                  lm(wt ~ gestation + smoke + mht + meth + parity + number + mwt + time + meth:mwt
+                          + gestation:number + gestation:mwt + gestation:mht + gestation:time 
+                    )
+                  )
+summary(pool(Mfwd_best))
+
+# pooling Mstep2
+Mstep_best <- with(chds_imp, 
+                  lm(wt ~ gestation + parity + meth + med + mht + mwt + income + smoke + time +
+                          number + gestation:income + gestation:number + gestation:med + med:mwt + meth:income
+                    )
+                  )
+summary(pool(Mstep_best))
+```
+
+# 3 Model Diagnostics 
+
+## 3.1 QQ & Residual Plots
+
+```{r}
+qq_plot <- function(M, main)
+{
+  sigma_hat <- sqrt(sum(resid(M)^2) / M$df.residual)
+  sigma_hat <- round(sigma_hat, 2) # round to 2 decimal places
+  
+  cex <- 0.8
+  qqnorm(resid(M) / sigma_hat, pch = 16, cex = cex, cex.axis = cex, main=main)
+  abline(a = 0, b = 1, col = "red") # add 45 degree line
+}
+
+residual_vs_predicted_plot <- function(M, main)
+{
+  res <- resid(M)
+  sigma_hat <- sqrt(sum(res^2) / M$df.residual)
+  sigma_hat <- round(sigma_hat, 2) # round to 2 decimal places
+  h <- hatvalues(M)
+  pred <- predict(M)
+  res_stu <- resid(M) / sqrt(1-h) # studentized residuals, but on the data scale
+  
+  cex <- .8 # controls the size of the points and labels
+  par(mar = c(4,4,.1,.1))
+  plot(pred, resid(M), pch = 21, bg = "black", cex = cex, 
+       cex.axis = cex, xlab = "Predicted Male Single-Fetus Birth Weight", 
+       ylab = "Residuals", main=main)
+  points(pred, res_stu, pch = 21, bg = "red", cex = cex)
+  legend(x = "bottomleft", c("Residuals", "Studentized Residuals"),
+         pch = 21, pt.bg = c("black", "red"), pt.cex = cex, cex = cex)
+  abline(h=0, lty=2, col="grey")
+}
+
+residual_vs_predicted_plot(Mfwd1, "Mfwd1")
+qq_plot(Mfwd1, "Mfwd1")
+
+residual_vs_predicted_plot(Mstep2, "Mstep2")
+qq_plot(Mstep2, "Mstep2")
+```
+
+
+### 3.2 Leverage And Influence Analysis 
+```{r}
+cooks_distance_vs_leverage_plot <- function(M, data, main)
+{
+  p <- length(coef(M))
+  n <- nrow(data)
+  h <- hatvalues(M)
+  res <- resid(M)
+  hbar <- p / n
+  
+  # cook’s distance vs. leverage
+  D <- cooks.distance(M)
+  
+  # flag some of the points
+  infl_ind <- which.max(D) # top influence point
+  lev_ind <- h > 2*hbar # leverage more than 2x the average
+  clrs <- rep("black", len = n)
+  
+  clrs[lev_ind] <- "blue"
+  clrs[infl_ind] <- "red"
+  par(mfrow = c(1,1), mar = c(4,4,1,1))
+  
+  cex <- .8
+  plot(h, D, xlab = "Leverage", ylab = "Cook Influence Measure",
+       pch = 21, bg = clrs, cex = cex, cex.axis = cex, main=main)
+  abline(v = 2*hbar, col = "grey60", lty = 2) # 2x average leverage
+  legend("topleft", legend = c("High Leverage", "High Influence"), pch = 21,
+         pt.bg = c("blue", "red"), cex = cex, pt.cex = cex)
+  
+}
+
+cooks_distance_vs_leverage_plot(Mfwd1, chds1, "Mfwd1")
+cooks_distance_vs_leverage_plot(Mstep2, chds2, "Mstep2")
+```
+
+## 3.3 Cook's High Influence vs High Leverage Plots
+```{r, warning=FALSE}
+#cooks_highinf_vs_highlev Mfwd1
+p <- length(coef(Mfwd1))
+n <- nrow(chds1)
+h <- hatvalues(Mfwd1)
+res <- resid(Mfwd1)
+hbar <- p / n
+
+# cook’s distance vs. leverage
+D <- cooks.distance(Mfwd1)
+
+# flag some of the points
+infl_ind <- which.max(D) # top influence point
+lev_ind <- h > 2*hbar # leverage more than 2x the average
+clrs <- rep("black", len = n)
+
+omit_ind <- c(infl_ind, # most influential
+              which.max(h)) # highest leverage
+names(omit_ind) <- c("infl", "lev")
+
+yobs <- chds1[,"wt"] # observed values
+ 
+# all observations
+Mf <- lm(formula(Mfwd1), data=chds1)
+yfitf <- predict(Mf) # fitted values
+par(mfrow = c(2,2))
+par(mar = c(3.5,3.5,0,0)+.1)
+cex <- .8
+clrs2 <- c("red", "blue")
+
+for(jj in 1:length(omit_ind)) {
+  Mo <- lm(formula(Mfwd1), data=chds1, subset = -omit_ind[jj])
+  yfito <- predict(Mo, newdata = chds1) # fitted values at all observations
+  for (ii in c("gestation", "mwt")) {
+    # response vs. each covariate
+    xobs <- chds1[,ii] # covariate
+    ylim <- range(yobs, yfitf, yfito) # y-range of plot
+    # observed
+    plot(xobs, yobs, pch = 21, bg = clrs, cex = cex, cex.axis = cex, xlab = "", ylab = "")
+    
+    title(xlab = ii, ylab = "Weight", line = 2)
+    # fitted, all observations
+    points(xobs, yfitf, pch = 3, lwd = 2, cex = cex)
+    # fitted, one omitted observation
+    points(xobs, yfito, col = clrs2[jj], pch = 6, lwd = 2, cex = cex)
+    # connect with lines
+    segments(x0 = xobs, y0 = pmin(yobs, yfitf, yfito),
+             y1 = pmax(yobs, yfitf, yfito), lty = 2) # connect them
+    
+    legend("bottomright", legend = c("Observed", "Fitted (all obs.)",
+                                     paste0("Fitted (omit ", names(omit_ind)[jj], " obs.)")),
+           pch = c(21,3,6), lty = c(NA, NA, NA),
+           lwd = c(NA, 2, 2), pt.bg = "black",
+           col = c("black", "black", clrs2[jj]),
+           cex = cex, pt.cex = cex)
+  }
+}
+```
+
+
+```{r, warning=FALSE}
+p <- length(coef(Mstep2))
+n <- nrow(chds2)
+h <- hatvalues(Mstep2)
+res <- resid(Mstep2)
+hbar <- p / n
+
+# cook’s distance vs. leverage
+D <- cooks.distance(Mstep2)
+
+# flag some of the points
+infl_ind <- which.max(D) # top influence point
+lev_ind <- h > 2*hbar # leverage more than 2x the average
+clrs <- rep("black", len = n)
+
+omit_ind <- c(infl_ind, # most influential
+              which.max(h)) # highest leverage
+names(omit_ind) <- c("infl", "lev")
+
+yobs <- chds2[,"wt"] # observed values
+Mf <- lm(formula(Mstep2), data=chds2)
+yfitf <- predict(Mf) # fitted values
+par(mfrow = c(2,2))
+par(mar = c(3.5,3.5,0,0)+.1)
+cex <- .8
+clrs2 <- c("red", "blue")
+
+for(jj in 1:length(omit_ind)) {
+  # model with omitted observation
+  Mo <- lm(formula(Mstep2), data=chds2, subset = -omit_ind[jj])
+  yfito <- predict(Mo, newdata = chds2) # fitted values at all observations
+  for (ii in c("gestation", "mwt")) {
+    # response vs. each covariate
+    xobs <- chds2[,ii] # covariate
+    ylim <- range(yobs, yfitf, yfito) # y-range of plot
+    # observed
+    plot(xobs, yobs, pch = 21, bg = clrs, cex = cex, cex.axis = cex, xlab = "", ylab = "")
+    
+    title(xlab = ii, ylab = "Weight", line = 2)
+    # fitted, all observations
+    points(xobs, yfitf, pch = 3, lwd = 2, cex = cex)
+    # fitted, one omitted observation
+    points(xobs, yfito, col = clrs2[jj], pch = 6, lwd = 2, cex = cex)
+    # connect with lines
+    segments(x0 = xobs, y0 = pmin(yobs, yfitf, yfito),
+             y1 = pmax(yobs, yfitf, yfito), lty = 2) # connect them
+    
+    legend("bottomright", legend = c("Observed", "Fitted (all obs.)",
+                                     paste0("Fitted (omit ", names(omit_ind)[jj], " obs.)")),
+           pch = c(21,3,6), lty = c(NA, NA, NA),
+           lwd = c(NA, 2, 2), pt.bg = "black",
+           col = c("black", "black", clrs2[jj]),
+           cex = cex, pt.cex = cex)
+  }
+}
+```
